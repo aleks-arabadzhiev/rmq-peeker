@@ -85,7 +85,7 @@ Add your environment details using the following JSON structure. You can add as 
    ```
 
 2. **Open the Dashboard:**
-   Open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+   Open your web browser and navigate to [http://localhost:3001](http://localhost:3001).
 
 3. **Peek at Messages:**
    Click on any environment in the left sidebar. Confirm the prompt, and the app will securely fetch and display the current queue sizes and their top messages.
