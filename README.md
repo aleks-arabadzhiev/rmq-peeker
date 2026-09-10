@@ -37,6 +37,13 @@ RabbitMQ Peeker allows developers and QA teams to view live messages in a queue 
 
 Before starting the application, you must define the RabbitMQ environments you want to monitor.
 
+Create a file named `config.json` inside the `src` directory:
+
+```bash
+touch src/config.json
+```
+
+
 Add your environment details using the following JSON structure to `src/config.json`. You can add as many connection objects to the array as you need:
 
 ```json
