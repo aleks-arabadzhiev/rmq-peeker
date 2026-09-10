@@ -1,0 +1,15 @@
+{
+  "connections": [
+    {
+      "name": "Local Dev",
+      "protocol": "amqp",
+      "host": "localhost",
+      "port": 5672,
+      "vhost": "/",
+      "username": "YOUR_USERNAME",
+      "password": "YOUR_PASSWORD",
+      "peek_count": 5,
+      "queues": ["queue_1", "queue_2"]
+    }
+  ]
+}
