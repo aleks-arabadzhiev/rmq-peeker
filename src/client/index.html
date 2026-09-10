@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RabbitMQ Peeker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h3 class="modal-title">Confirm Fetch</h3>
+        <p class="modal-text">Do you want to peek into <strong id="modal-env-name"></strong>?</p>
+        <div class="modal-actions">
+            <button id="modal-no-btn" class="modal-btn no-btn">No</button>
+            <button id="modal-yes-btn" class="modal-btn yes-btn">Yes</button>
+        </div>
+    </div>
+</div>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        RMQ Peeker
+    </div>
+    <div id="nav-list" class="nav-list"></div>
+</div>
+
+<div class="main-content">
+    <div class="content-header">
+        <h1 id="env-title" class="content-title">Select an Environment</h1>
+    </div>
+    
+    <div id="loading">Connecting to cluster and fetching messages...</div>
+    
+    <div id="queues-container">
+        <div class="empty-queue-box" style="border-style: solid;">
+            Choose a RabbitMQ configuration from the sidebar to inspect its queues.
+        </div>
+    </div>
+</div>
+
+<script>
+    let pendingEnv = null;
+
+    window.onload = async () => {
+        try {
+            const response = await fetch('/api/connections');
+            const connections = await response.json();
+            const navList = document.getElementById('nav-list');
+            
+            if (connections.length === 0) {
+                navList.innerHTML = '<div style="padding: 20px; color: #ef4444;">No connections found.</div>';
+                return;
+            }
+
+            connections.forEach(connName => {
+                const btn = document.createElement('button');
+                btn.className = 'nav-btn';
+                btn.innerText = connName;
+                // Hookup modal logic instead of direct fetch
+                btn.onclick = () => showModal(connName);
+                navList.appendChild(btn);
+            });
+        } catch (err) {
+            document.getElementById('queues-container').innerHTML = `<div class="error-box">Failed to load configuration. Make sure server is running.</div>`;
+        }
+    };
+
+    // Modal Handlers
+    function showModal(connName) {
+        pendingEnv = connName;
+        document.getElementById('modal-env-name').innerText = connName;
+        document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function hideModal() {
+        pendingEnv = null;
+        document.getElementById('confirm-modal').classList.add('hidden');
+    }
+
+    document.getElementById('modal-no-btn').onclick = hideModal;
+    
+    document.getElementById('modal-yes-btn').onclick = () => {
+        if (pendingEnv) fetchQueues(pendingEnv);
+        hideModal();
+    };
+
+    async function fetchQueues(connName) {
+        const container = document.getElementById('queues-container');
+        const loading = document.getElementById('loading');
+        const envTitle = document.getElementById('env-title');
+        
+        envTitle.innerText = connName;
+        
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.disabled = true; 
+            if (btn.innerText === connName) btn.classList.add('active');
+        });
+
+        container.innerHTML = '';
+        loading.style.display = 'block';
+
+        try {
+            const response = await fetch(`/api/peek/${encodeURIComponent(connName)}`);
+            const data = await response.json();
+            
+            if (data.error) throw new Error(data.error);
+
+            loading.style.display = 'none';
+            
+            if (data.length === 0) {
+                container.innerHTML = `<div class="empty-queue-box">No queues configured for this environment.</div>`;
+            }
+
+            data.forEach(q => {
+                const badgeClass = q.totalMessages > 0 ? 'badge' : 'badge empty-badge';
+                
+                let html = `
+                <div class="queue-card collapsed">
+                    <div class="queue-header collapsible-header" onclick="toggleCollapse(this)">
+                        <h2 class="queue-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                            ${q.queue}
+                        </h2>
+                        <span class="${badgeClass}">${q.totalMessages} Waiting</span>
+                    </div>
+                    <div class="collapsible-body">`;
+                
+                if (q.error) {
+                    html += `<div class="error-box">${q.error}</div>`;
+                } else if (q.peeked.length === 0) {
+                    html += `<div class="empty-queue-box">This queue is currently empty.</div>`;
+                } else {
+                    q.peeked.forEach((msg, idx) => {
+                        html += `
+                        <div class="msg-container collapsed">
+                            <div class="msg-header collapsible-header" onclick="toggleCollapse(this)">
+                                <span class="msg-toggle-icon"></span>
+                                <div class="msg-label">Message ${idx + 1}</div>
+                            </div>
+                            <div class="collapsible-body">
+                                <pre class="msg-content">${escapeHtml(formatMessage(msg))}</pre>
+                            </div>
+                        </div>`;
+                    });
+                }
+                html += `</div></div>`;
+                container.innerHTML += html;
+            });
+        } catch (error) {
+            loading.style.display = 'none';
+            container.innerHTML = `
+                <h3 style="color: #ef4444; margin-top:0;">Failed to Connect</h3>
+                <div class="error-box">${error.message}</div>
+                <p style="color: #64748b; margin-top: 15px;">The server is still running. You can select another environment from the sidebar.</p>
+            `;
+        } finally {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.disabled = false);
+        }
+    }
+
+    function toggleCollapse(element) {
+        element.parentElement.classList.toggle('collapsed');
+    }
+
+    function formatMessage(rawMsg) {
+        try {
+            const parsed = JSON.parse(rawMsg);
+            return JSON.stringify(parsed, null, 2);
+        } catch (e) {
+            return rawMsg; 
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+</script>
+
+</body>
+</html>
