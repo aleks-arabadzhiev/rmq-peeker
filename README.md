@@ -25,3 +25,67 @@ RabbitMQ Peeker allows developers and QA teams to view live messages in a queue 
    ```bash
    git clone [https://github.com/yourusername/rmq-peeker.git](https://github.com/yourusername/rmq-peeker.git)
    cd rmq-peeker
+   ```
+
+2. **Install dependencies:**
+   Since the project includes a `package.json`, you only need to run the standard install command to download `express` and `amqplib`.
+   ```bash
+   npm install
+   ```
+
+## ⚙️ Configuration
+
+Before starting the application, you must define the RabbitMQ environments you want to monitor.
+
+Create a file named `config.json` inside the `src` directory:
+
+```bash
+touch src/config.json
+```
+
+Add your environment details using the following JSON structure. You can add as many connection objects to the array as you need:
+
+```json
+{
+  "connections": [
+    {
+      "name": "Local Dev",
+      "protocol": "amqp",
+      "host": "localhost",
+      "port": 5672,
+      "vhost": "/",
+      "username": "dev_user",
+      "password": "dev_password",
+      "peek_count": 5,
+      "queues": ["orders_queue", "payment_events"]
+    },
+    {
+      "name": "Production",
+      "protocol": "amqps",
+      "host": "rabbitmq.mycompany.com",
+      "port": 5671,
+      "vhost": "prod_vhost",
+      "username": "readonly_user",
+      "password": "super_secret_password",
+      "peek_count": 3,
+      "queues": ["dead_letter_queue"]
+    }
+  ]
+}
+```
+
+* **`protocol`:** Use `"amqp"` for standard connections or `"amqps"` for TLS-encrypted connections.
+* **`peek_count`:** The maximum number of messages to pull and display from the top of the queue.
+
+## 💻 Usage
+
+1. **Start the Node.js server:**
+   ```bash
+   node src/server.js
+   ```
+
+2. **Open the Dashboard:**
+   Open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+
+3. **Peek at Messages:**
+   Click on any environment in the left sidebar. Confirm the prompt, and the app will securely fetch and display the current queue sizes and their top messages.
