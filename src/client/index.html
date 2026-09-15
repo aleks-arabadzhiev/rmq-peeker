@@ -134,12 +134,18 @@
                         <span class="${badgeClass}">${q.totalMessages} Waiting</span>
                     </div>
                     <div class="collapsible-body">`;
-                
+
                 if (q.error) {
                     html += `<div class="error-box">${q.error}</div>`;
                 } else if (q.peeked.length === 0) {
                     html += `<div class="empty-queue-box">This queue is currently empty.</div>`;
                 } else {
+                    html += `
+                        <div class="queue-filter-row" onclick="event.stopPropagation()">
+                            <input type="text" class="queue-filter-input" placeholder="Filter messages by content..." oninput="filterMessages(this)">
+                            <span class="filter-count"></span>
+                        </div>
+                        <div class="messages-list">`;
                     q.peeked.forEach((msg, idx) => {
                         html += `
                         <div class="msg-container collapsed">
@@ -152,6 +158,7 @@
                             </div>
                         </div>`;
                     });
+                    html += `</div>`;
                 }
                 html += `</div></div>`;
                 container.innerHTML += html;
@@ -170,6 +177,36 @@
 
     function toggleCollapse(element) {
         element.parentElement.classList.toggle('collapsed');
+    }
+
+    function filterMessages(input) {
+        const term = input.value.trim().toLowerCase();
+        const messagesList = input.closest('.collapsible-body').querySelector('.messages-list');
+        const countLabel = input.parentElement.querySelector('.filter-count');
+        const containers = Array.from(messagesList.querySelectorAll('.msg-container'));
+
+        let visibleCount = 0;
+        containers.forEach(container => {
+            const contentEl = container.querySelector('.msg-content');
+            const content = (contentEl.textContent || '').toLowerCase();
+            const matches = term === '' || content.includes(term);
+            container.classList.toggle('filtered-hidden', !matches);
+            if (matches) visibleCount++;
+        });
+
+        countLabel.innerText = term === '' ? '' : `${visibleCount} / ${containers.length} match${containers.length === 1 ? '' : 'es'}`;
+
+        let noMatchBox = messagesList.querySelector('.no-match-box');
+        if (term !== '' && visibleCount === 0) {
+            if (!noMatchBox) {
+                noMatchBox = document.createElement('div');
+                noMatchBox.className = 'empty-queue-box no-match-box';
+                noMatchBox.innerText = 'No messages match your filter.';
+                messagesList.appendChild(noMatchBox);
+            }
+        } else if (noMatchBox) {
+            noMatchBox.remove();
+        }
     }
 
     function formatMessage(rawMsg) {
